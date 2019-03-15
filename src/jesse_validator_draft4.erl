@@ -382,9 +382,11 @@ check_properties(Value, Properties, State) ->
     = lists:foldl( fun({PropertyName, PropertySchema}, CurrentState) ->
                        case get_value(PropertyName, Value) of
                             ?not_found ->
-                               case get_value(?DEFAULT, PropertySchema) of
+                               PropertySchema1 = maybe_follow_reference(PropertySchema, State),
+                               io:format("Property ~p~n, Schema ~p~n Expanded Schema ~p~n", [PropertyName, PropertySchema, PropertySchema1]),
+                               case get_value(?DEFAULT, PropertySchema1) of
                                    ?not_found -> CurrentState;
-                                   Default -> check_default(PropertyName, PropertySchema, Default, CurrentState)
+                                   Default -> check_default(PropertyName, PropertySchema1, Default, CurrentState)
                                end;
                            Property ->
                                NewState = set_current_schema( CurrentState
@@ -1396,6 +1398,24 @@ set_value(PropertyName, Value, State) ->
                             , ?BOOLEAN
                             , ?OBJECT
                             ]).
+
+%% @private
+maybe_follow_reference([{<<"$ref">>, <<"#">>}] = Schema, _State) ->
+  Schema;
+maybe_follow_reference([{?REF, RefSchemaURI} | Attr] = Schema, State) ->
+  case Attr of
+    [] ->
+      case resolve_ref(RefSchemaURI, State) of
+        {error, _NewState} ->
+          Schema;
+        {ok, _NewState, RefSchema} ->
+          RefSchema
+      end;
+    _ ->
+      Schema
+  end;
+maybe_follow_reference(Schema, _State) ->
+  Schema.
 
 %% @private
 check_default(PropertyName, PropertySchema, Default, State) ->

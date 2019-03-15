@@ -23,8 +23,19 @@
 
 setter_test() ->
   Schema = {[
+    {<<"$schema">>, <<"http://json-schema.org/draft-04/schema#">>},
     {<<"type">>, <<"object">>},
+    {<<"definitions">>, {[
+      {<<"timeout">>, {[
+        {<<"type">>, <<"number">>},
+        {<<"default">>, 3600}
+      ]}}
+    ]}},
+    {<<"additionalProperties">>, false},
     {<<"properties">>, {[
+      {<<"timeout">>, {[
+        {<<"$ref">>, <<"#/definitions/timeout">>}
+      ]}},
       {<<"bar">>, {[
         {<<"type">>, <<"string">>},
         {<<"minLength">>, 4},
@@ -33,7 +44,8 @@ setter_test() ->
     ]}}
    ]},
 
-  Default = {[{<<"bar">>, <<"awesome">>}]},
+  Default = {[{<<"bar">>, <<"awesome">>},
+              {<<"timeout">>, 3600}]},
   Value = {[]},
   Fun = fun([K], V, {L1}) ->
                 {[{K, V} | proplists:delete(K, L1)]}
