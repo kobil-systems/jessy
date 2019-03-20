@@ -35,13 +35,13 @@
 %% @doc Validates json `Data' against `JsonSchema' with `Options'.
 %% If the given json is valid, then it is returned to the caller as is,
 %% otherwise an exception will be thrown.
--spec validate( JsonSchema :: jesse:json_term()
-              , Data       :: jesse:json_term()
-              , Options    :: [{Key :: atom(), Data :: any()}]
+-spec validate( JsonSchema :: jesse:schema()
+              , Value      :: jesse:json_term()
+              , Options    :: jesse:options()
               ) -> {ok, jesse:json_term()}
                  | no_return().
 validate(JsonSchema, Value, Options0) ->
-  Options = [{with_value, Value} | proplists:delete(with_value, Options0)],
+  Options  = [{with_value, Value} | proplists:delete(with_value, Options0)],
   State    = jesse_state:new(JsonSchema, Options),
   NewState = validate_with_state(JsonSchema, Value, State),
   {result(NewState), jesse_state:get_current_value(NewState)}.

@@ -64,7 +64,7 @@
          , error_handler      :: jesse:error_handler()
          , error_list         :: jesse:error_list()
          , external_validator :: jesse:external_validator()
-         , setter_fun         :: setter_fun()
+         , setter_fun         :: setter_fun() | undefined
          , id                 :: jesse:schema_id()
          , root_schema        :: jesse:schema()
          , schema_loader_fun  :: jesse:schema_loader_fun()
@@ -133,6 +133,9 @@ new(JsonSchema, Options) ->
                                      , Options
                                      , 0
                                      ),
+  Value = proplists:get_value( with_value
+                             , Options
+                             ),
   MetaSchemaVer = jesse_json_path:value( ?SCHEMA
                                        , JsonSchema
                                        , ?default_schema_ver
@@ -141,6 +144,7 @@ new(JsonSchema, Options) ->
                                         , Options
                                         , MetaSchemaVer
                                         ),
+
   ErrorHandler = proplists:get_value( error_handler
                                     , Options
                                     , ?default_error_handler_fun
@@ -155,20 +159,19 @@ new(JsonSchema, Options) ->
   SetterFun = proplists:get_value( setter_fun
                                  , Options
                                  ),
-  Value = proplists:get_value( with_value
-                             , Options
-                             ),
-  NewState = #state{ root_schema        = JsonSchema
+
+  NewState = #state{allowed_errors      = AllowedErrors
                    , current_path       = []
-                   , allowed_errors     = AllowedErrors
-                   , error_list         = []
-                   , error_handler      = ErrorHandler
-                   , default_schema_ver = DefaultSchemaVer
-                   , schema_loader_fun  = LoaderFun
-                   , external_validator = ExternalValidator
-                   , setter_fun         = SetterFun
                    , current_value      = Value
+                   , default_schema_ver = DefaultSchemaVer
+                   , error_handler      = ErrorHandler
+                   , error_list         = []
+                   , external_validator = ExternalValidator
+                   , root_schema        = JsonSchema
+                   , schema_loader_fun  = LoaderFun
+                   , setter_fun         = SetterFun
                    },
+
   set_current_schema(NewState, JsonSchema).
 
 %% @doc Removes the last element from `current_path' in `State'.
