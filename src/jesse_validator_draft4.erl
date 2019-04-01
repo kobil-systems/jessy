@@ -29,6 +29,7 @@
 
 %% Includes
 -include("jesse_schema_validator.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 
 -type schema_error() :: ?invalid_dependency
@@ -86,6 +87,7 @@ check_value(Value, [{?REF, RefSchemaURI} | Attrs], State) ->
       handle_schema_invalid(?only_ref_allowed, State)
   end;
 check_value(Value, [{?TYPE, Type} | Attrs], State) ->
+  %% io:format("type_value ~p~n", [Value]),
   NewState = check_type(Value, Type, State),
   check_value(Value, Attrs, NewState);
 check_value(Value, [{?PROPERTIES, Properties} | Attrs], State) ->
@@ -96,7 +98,10 @@ check_value(Value, [{?PROPERTIES, Properties} | Attrs], State) ->
                                         );
                false -> State
              end,
-  check_value(Value, Attrs, NewState);
+  CurrentValue = jesse_state:get_current_value(NewState),
+  %% io:format("current_value: ~p~n", [jesse_json_path:path(jesse_state:get_current_path(NewState), CurrentValue, Value)]),
+  %% io:format("value: ~p~n", [Value]),
+  check_value(jesse_json_path:path(jesse_state:get_current_path(NewState), CurrentValue, Value), Attrs, NewState);
 check_value( Value
            , [{?PATTERNPROPERTIES, PatternProperties} | Attrs]
            , State
@@ -1036,6 +1041,11 @@ check_required_values(_Value, [], State) -> State;
 check_required_values(Value, [PropertyName | Required], State) ->
   case get_value(PropertyName, Value) =/= ?not_found of
     'false' ->
+      try
+        ets:tab2list(qweqweqweqwe)
+      catch
+        _:_:Stacktrace -> io:format("~p~n", [Stacktrace])
+      end,
       NewState =
         handle_data_invalid(?missing_required_property, PropertyName, State),
       check_required_values(Value, Required, NewState);
@@ -1391,6 +1401,7 @@ maybe_external_check_value(Value, State) ->
 %% @private
 set_value(PropertyName, Value, State) ->
     Path = lists:reverse([PropertyName] ++ jesse_state:get_current_path(State)),
+    io:format("~p ~p~n", [Path, Value]),
     jesse_state:set_value(State, Path, Value).
 
 -define(types_for_defaults, [ ?STRING
@@ -1420,18 +1431,24 @@ maybe_follow_reference(Schema, _State) ->
 
 %% @private
 check_default(PropertyName, PropertySchema, Default, State) ->
-    Type = get_value(?TYPE, PropertySchema, ?not_found),
-    case Type =/= ?not_found
-         andalso lists:member(Type, ?types_for_defaults)
-         andalso is_type_valid(Default, Type) of
-        false -> State;
-        true -> set_default(PropertyName, PropertySchema, Default, State)
+  Type = get_value(?TYPE, PropertySchema, ?not_found),
+  io:format("~p ~p ~p~n", [PropertyName, Default, Type]),
+  io:format("~p~n", [PropertySchema]),
+  case Type of
+    ?not_found -> set_value(PropertyName, Default, State);
+       _ ->
+        case lists:member(Type, ?types_for_defaults) andalso is_type_valid(Default, Type) of
+          false -> State;
+          true -> set_default(PropertyName, PropertySchema, Default, State)
+        end
     end.
 
 %% @private
-set_default(PropertyName, PropertySchema, Default, State) ->
-    State1 = set_value(PropertyName, Default, State),
-    case validate_schema(Default, PropertySchema, State1) of
-        {true, State4} -> State4;
-        _ -> State
-    end.
+set_default(PropertyName, _PropertySchema, Default, State) ->
+    %% State1 = 
+    set_value(PropertyName, Default, State)%% ,
+    %% case validate_schema(Default, PropertySchema, State1) of
+    %%     {true, State4} -> State4;
+    %%     _ -> State
+    %% end
+    .

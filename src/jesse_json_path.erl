@@ -25,6 +25,8 @@
 -type kvc_key() :: binary() | atom() | string().
 -type proplist() :: [{kvc_key(), kvc_obj()}].
 
+-export([add/3]).
+
 -export_type([proplist/0, kvc_key/0, kvc_obj/0]).
 
 %% @doc Parse a JSON Pointer
@@ -302,3 +304,74 @@ parse_json_pointer_token(Token) ->
                , {<<"~1">>, <<"/">>}
                ]
              ).
+
+get(Path, JSON) ->
+    try get0(maybe_decode(Path), JSON)
+    catch error:_ -> erlang:error(badarg)
+    end.
+
+get0([], JSON) -> JSON;
+get0([Ref|Rest], JSON)
+  when is_binary(Ref), is_map(JSON) ->
+    get0(Rest, maps:get(Ref, JSON));
+get0([Ref|Rest], JSON)
+  when is_atom(Ref), is_map(JSON) ->
+    get0(Rest, maps:get(atom_to_binary(Ref, utf8), JSON));
+get0([Ref|Rest], JSON)
+  when is_integer(Ref), is_list(JSON) ->
+                                                % jsonpointer arrays are zero indexed, erlang lists are indexed from 1
+    get0(Rest, lists:nth(Ref + 1, JSON));
+get0([Ref|Rest], JSON)
+  when is_binary(Ref), is_list(JSON) ->
+    get0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
+
+add(Path, Value, JSON)
+  when is_integer(Value); is_float(Value); is_binary(Value);
+       is_map(Value); is_list(Value);
+       Value == true; Value == false; Value == null ->
+    try add0(maybe_decode(Path), Value, JSON)
+    catch error:_ -> erlang:error(badarg)
+    end;
+add(_, _, _) -> erlang:error(badarg).
+
+add0([], Value, _JSON) -> Value;
+add0([Ref], Value, JSON)
+  when is_binary(Ref), is_map(JSON) ->
+    maps:put(Ref, Value, JSON);
+add0([Ref], Value, JSON)
+  when is_integer(Ref), is_list(JSON) ->
+    {A, B} = lists:split(Ref, JSON),
+    A ++ [Value] ++ B;
+add0([<<"-">>], Value, JSON)
+  when is_list(JSON) ->
+    JSON ++ [Value];
+add0([Ref|Rest], Value, JSON)
+  when is_binary(Ref), is_map(JSON) ->
+    maps:update(Ref, add0(Rest, Value, get([Ref], JSON)), JSON);
+add0([Ref|Rest], Value, JSON)
+  when is_integer(Ref), is_list(JSON) ->
+    {A, [B|C]} = lists:split(Ref, JSON),
+    A ++ [add0(Rest, Value, B)] ++ C;
+add0([Ref|Rest], Value, JSON)
+  when is_atom(Ref), is_map(JSON) ->
+    add0([atom_to_binary(Ref, utf8)] ++ Rest, Value, JSON);
+add0([Ref|Rest], Value, JSON)
+  when is_binary(Ref), is_list(JSON) ->
+    add0([jsonpointer:ref_to_int(Ref)] ++ Rest, Value, JSON).
+
+maybe_decode(Path) when is_list(Path) -> Path;
+maybe_decode(Path) when is_binary(Path) -> decode(Path).
+
+decode(Bin) -> decode(Bin, []).
+
+decode(<<>>, Acc) -> lists:reverse(Acc);
+decode(<<$~, $0, Rest/binary>>, [Current|Done]) ->
+    decode(Rest, [<<Current/binary, $~>>] ++ Done);
+decode(<<$~, $1, Rest/binary>>, [Current|Done]) ->
+    decode(Rest, [<<Current/binary, $/>>] ++ Done);
+decode(<<$/, Rest/binary>>, []) ->
+    decode(Rest, [<<>>]);
+decode(<<$/, Rest/binary>>, [Current|Done]) ->
+    decode(Rest, [<<>>, Current] ++ Done);
+decode(<<Codepoint/utf8, Rest/binary>>, [Current|Done]) ->
+    decode(Rest, [<<Current/binary, Codepoint/utf8>>] ++ Done).

@@ -29,12 +29,27 @@ setter_test() ->
       {<<"timeout">>, {[
         {<<"type">>, <<"number">>},
         {<<"default">>, 3600}
+      ]}},
+      {<<"noTypeTimeout">>, {[
+        {<<"anyOf">>, [
+                       {[
+                         {<<"type">>, <<"number">>},
+                         {<<"minimum">>, 0}
+                        ]},
+                       {[
+                         {<<"enum">>, [false]}
+                        ]}
+                      ]},
+        {<<"default">>, false}
       ]}}
     ]}},
     {<<"additionalProperties">>, false},
     {<<"properties">>, {[
       {<<"timeout">>, {[
         {<<"$ref">>, <<"#/definitions/timeout">>}
+      ]}},
+      {<<"noTypeTimeout">>, {[
+        {<<"$ref">>, <<"#/definitions/noTypeTimeout">>}
       ]}},
       {<<"bar">>, {[
         {<<"type">>, <<"string">>},
@@ -45,6 +60,7 @@ setter_test() ->
    ]},
 
   Default = {[{<<"bar">>, <<"awesome">>},
+              {<<"noTypeTimeout">>, false},
               {<<"timeout">>, 3600}]},
   Value = {[]},
   Fun = fun([K], V, {L1}) ->
@@ -177,7 +193,12 @@ data_invalid_test() ->
       {<<"foo">>, {[
         {<<"type">>, <<"object">>},
         {<<"properties">>, {[
-            {<<"subfoo">>, IntegerSchema}
+            {<<"subfoo">>, IntegerSchema},
+            {<<"qwe">>, {[
+                          {<<"type">>, <<"string">>},
+                          {<<"minLength">>, 4},
+                          {<<"default">>, <<"awesome">>}
+                         ]}}
         ]}},
         {<<"additionalProperties">>, false}
       ]}}
@@ -194,6 +215,22 @@ data_invalid_test() ->
                                         {<<"bar">>, 2}
                                      ]}}]}, [])
   ),
+
+  
+
+  Fun = fun
+          ([K], V, {L1}) when is_list(L1) ->
+            {[{K, V} | proplists:delete(K, L1)]};
+          
+          (K, V, M1) when is_map(M1) ->
+            jesse_json_path:add(K, V, M1)
+          end,
+
+  ?assertMatch({ok,#{<<"foo">> :=
+                       #{<<"qwe">> := <<"awesome">>,
+                         <<"subfoo">> := 1}}},
+               jesse_schema_validator:validate(Schema3,
+                                               #{<<"foo">> => #{<<"subfoo">> => 1}}, [{setter_fun, Fun}])),
 
   %% Items: A zero-based index is used in the property path
   ItemsSchema = {[

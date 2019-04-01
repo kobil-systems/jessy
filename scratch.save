@@ -1,0 +1,110 @@
+
+application:ensure_all_started(jesse).
+
+dbg:tracer().
+
+dbg:p(all, c).
+
+dbg:tp({jesse_validator_draft4, '_', '_'}, c).
+
+IntegerSchema = {[{<<"type">>, <<"integer">>}]}.
+
+ItemsSchema = {[
+    {<<"type">>, <<"array">>},
+    {<<"items">>, IntegerSchema},
+    {<<"maxItems">>, 3}
+  ]},
+
+Fun = fun
+              ([K], V, {L1}) when is_list(L1) ->
+                  {[{K, V} | proplists:delete(K, L1)]};
+
+              (K, V, M1) when is_map(M1) ->
+                  io:format("~p ~p~n", [K, V]),
+                  io:format("M1: ~p~n", [M1]),
+                  jesse_json_path:add(K, V, M1)
+          end,
+
+  Schema3 = {[
+    {<<"type">>, <<"object">>},
+    {<<"properties">>, {[
+      {<<"foo">>, {[
+        {<<"type">>, <<"object">>},
+        {<<"properties">>, {[
+            {<<"subfoo">>, IntegerSchema}
+,
+                             {<<"bar">>, {[
+                                           {<<"type">>, <<"string">>},
+                                           {<<"minLength">>, 4},
+                                           {<<"default">>, <<"awesome">>}
+                                          ]}}
+        ]}},
+        {<<"additionalProperties">>, false}
+      ]}}
+    ]}},
+    {<<"additionalProperties">>, false}
+  ]}.
+
+jesse_schema_validator:validate(Schema3, #{<<"foo">> => #{<<"subfoo">> => 1}}, [{allowed_errors, infinity},
+                                                                                {setter_fun, Fun}]).
+
+
+
+
+
+
+
+
+
+
+application:ensure_all_started(jesse).
+
+dbg:tracer().
+
+dbg:p(all, c).
+
+dbg:tp({jesse_validator_draft4, '_', '_'}, c).
+
+IntegerSchema = {[{<<"type">>, <<"integer">>}]}.
+
+FooSchema = {[
+        {<<"type">>, <<"object">>},
+        {<<"properties">>, {[
+            {<<"subfoo">>, IntegerSchema}
+,
+                             {<<"bar">>, {[
+                                           {<<"type">>, <<"string">>},
+                                           {<<"minLength">>, 4},
+                                           {<<"default">>, <<"awesome">>}
+                                          ]}}
+        ]}},
+        {<<"additionalProperties">>, false}
+      ]}.
+
+ItemsSchema = {[
+    {<<"type">>, <<"array">>},
+    {<<"items">>, FooSchema},
+    {<<"maxItems">>, 3}
+  ]},
+
+Fun = fun
+              ([K], V, {L1}) when is_list(L1) ->
+                  {[{K, V} | proplists:delete(K, L1)]};
+
+              (K, V, M1) when is_map(M1) ->
+                  io:format("~p ~p~n", [K, V]),
+                  io:format("M1: ~p~n", [M1]),
+                  jesse_json_path:add(K, V, M1)
+          end,
+
+  Schema3 = {[
+    {<<"type">>, <<"object">>},
+    {<<"properties">>, {[
+      {<<"foo">>, ItemsSchema}
+    ]}},
+    {<<"additionalProperties">>, false}
+  ]}.
+
+jesse_schema_validator:validate(Schema3, #{<<"foo">> => [#{<<"subfoo">> => 1}]}, [{allowed_errors, infinity},
+                                                                                {setter_fun, Fun}]).
+

@@ -44,6 +44,8 @@
         , undo_resolve_ref/2
         , canonical_path/2
         , combine_id/2
+        , validator_options/1
+        , validator_option/2, validator_option/3
         ]).
 
 -export_type([ state/0
@@ -68,6 +70,7 @@
          , id                 :: jesse:schema_id()
          , root_schema        :: jesse:schema()
          , schema_loader_fun  :: jesse:schema_loader_fun()
+         , validator_options  :: jesse:options()
          }
        ).
 
@@ -160,6 +163,11 @@ new(JsonSchema, Options) ->
                                  , Options
                                  ),
 
+  ValidatorOptions = proplists:get_value( validator_options
+                                        , Options
+                                        , []
+                                        ),
+
   NewState = #state{allowed_errors      = AllowedErrors
                    , current_path       = []
                    , current_value      = Value
@@ -170,6 +178,7 @@ new(JsonSchema, Options) ->
                    , root_schema        = JsonSchema
                    , schema_loader_fun  = LoaderFun
                    , setter_fun         = SetterFun
+                   , validator_options  = ValidatorOptions
                    },
 
   set_current_schema(NewState, JsonSchema).
@@ -416,9 +425,32 @@ get_external_validator(#state{external_validator = Fun}) ->
 get_current_value(#state{current_value = Value}) -> Value.
 
 -spec set_value(State :: state(), jesse:path(), jesse:json_term()) -> state().
-set_value(#state{setter_fun=undefined}=State, _Path, _Value) -> State;
-set_value(#state{current_value=undefined}=State, _Path, _Value) -> State;
+set_value(#state{setter_fun=undefined}=State, _Path, _Value) -> io:format("setter_fun is undefined~n"),
+                                                                State;
+set_value(#state{current_value=undefined}=State, _Path, _Value) -> io:format("current_value is undefined~n"),
+                                                                   State;
 set_value(#state{setter_fun=Setter
                 ,current_value=Value
                 }=State, Path, NewValue) ->
-    State#state{current_value = Setter(Path, NewValue, Value)}.
+    NewCurrentValue = Setter(Path, NewValue, Value),
+  
+    %%   try
+    %%     ets:tab2list(qweqweqweqwe)
+    %%   catch
+    %%     _:_:Stacktrace -> io:format("~p~n", [Stacktrace])
+    %%   end,
+    %% io:format("current_value updated to ~p~n~n~n", [NewCurrentValue]),
+    State#state{current_value = NewCurrentValue}.
+
+-spec validator_options(State :: state()) -> jesse:options().
+validator_options(#state{validator_options = Options}) ->
+  Options.
+
+-spec validator_option(Option :: atom(), State :: state()) -> any().
+validator_option(Option, #state{validator_options = Options}) ->
+  proplists:get_value(Option, Options).
+
+-spec validator_option(Option :: atom(), State :: state(), Default :: any()) ->
+                          any().
+validator_option(Option, #state{validator_options = Options}, Default) ->
+  proplists:get_value(Option, Options, Default).

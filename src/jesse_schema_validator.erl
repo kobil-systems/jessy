@@ -30,6 +30,7 @@
 
 %% Includes
 -include("jesse_schema_validator.hrl").
+-include_lib("eunit/include/eunit.hrl").
 
 %%% API
 %% @doc Validates json `Data' against `JsonSchema' with `Options'.
@@ -74,7 +75,7 @@ result(State) ->
   ErrorList = jesse_state:get_error_list(State),
   case ErrorList of
     [] -> ok;
-    _  -> throw(ErrorList)
+    _  -> file:write_file("/tmp/foo", io_lib:fwrite("~p.\n", [ErrorList])), throw(ErrorList)
   end.
 
 %% @doc Runs appropriate validator depending on schema version
