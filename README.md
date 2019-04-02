@@ -1,5 +1,7 @@
 **This repository is the Kobil-maintained follow-up of https://github.com/for-get/jesse.**
 
+Also includes portions of https://github.com/talentdeficit/json
+
 # jesse [![Build Status][2]][1]
 
 jesse (JSON Schema Erlang) is an implementation of a JSON Schema validator
