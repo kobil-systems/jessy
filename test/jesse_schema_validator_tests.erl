@@ -59,10 +59,48 @@ setter_test() ->
     ]}}
    ]},
 
+  ESchema = {[
+    {<<"$schema">>, <<"http://json-schema.org/draft-04/schema#">>},
+    {<<"type">>, <<"object">>},
+    {<<"definitions">>, {[
+      {<<"timeout">>, {[
+        {<<"type">>, <<"number">>},
+        {<<"default">>, 3600}
+      ]}},
+      {<<"noTypeTimeout">>, {[
+        {<<"anyOf">>, [
+                       {[
+                         {<<"type">>, <<"number">>},
+                         {<<"minimum">>, 0}
+                        ]},
+                       {[
+                         {<<"enum">>, [false]}
+                        ]}
+                      ]},
+        {<<"default">>, false}
+      ]}}
+    ]}},
+    {<<"additionalProperties">>, false},
+    {<<"properties">>, {[
+      {<<"timeout">>, {[
+        {<<"$ref">>, <<"#/definitions/timeout">>}
+      ]}},
+      {<<"noTypeTimeout">>, {[
+        {<<"$ref">>, <<"#/definitions/noTypeTimeout">>}
+      ]}},
+      {<<"bar">>, {[
+        {<<"type">>, <<"string">>},
+        {<<"minLength">>, 4},
+        {<<"default">>, <<"wd">>}
+      ]}}
+    ]}}
+   ]},
+
   Default = {[{<<"bar">>, <<"awesome">>},
               {<<"noTypeTimeout">>, false},
               {<<"timeout">>, 3600}]},
   Value = {[]},
+  EValue = {[{<<"bar">>, <<"42">>}]},
   Fun = fun([K], V, {L1}) ->
                 {[{K, V} | proplists:delete(K, L1)]}
         end,
@@ -73,6 +111,20 @@ setter_test() ->
                 )
   , ?assertEqual({ok, Default}
                 ,jesse_schema_validator:validate(Schema, Value, Options)
+                )
+  , ?assertThrow([{data_invalid, {[{<<"type">>, <<"string">>},
+                                  {<<"minLength">>, 4},
+                                   {<<"default">>, <<"awesome">>}]},
+                   wrong_length, <<"42">>,
+                   [<<"bar">>]}]
+                ,jesse_schema_validator:validate(Schema, EValue, Options)
+                )
+  , ?assertThrow([{data_invalid, [{<<"type">>, <<"string">>},
+                                  {<<"minLength">>, 4},
+                                  {<<"default">>, <<"wd">>}],
+                   wrong_length, <<"wd">>,
+                   []}]
+                ,jesse_schema_validator:validate(ESchema, Value, Options)
                 )
   ].
 

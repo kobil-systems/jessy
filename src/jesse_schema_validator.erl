@@ -75,7 +75,7 @@ result(State) ->
   ErrorList = jesse_state:get_error_list(State),
   case ErrorList of
     [] -> ok;
-    _  -> file:write_file("/tmp/foo", io_lib:fwrite("~p.\n", [ErrorList])), throw(ErrorList)
+    _  -> throw(ErrorList)
   end.
 
 %% @doc Runs appropriate validator depending on schema version

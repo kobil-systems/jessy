@@ -34,6 +34,7 @@
         , get_default_schema_ver/1
         , get_error_handler/1
         , get_error_list/1
+        , get_setter_fun/1
         , new/2
         , remove_last_from_path/1
         , set_allowed_errors/2
@@ -126,6 +127,9 @@ get_error_handler(#state{error_handler = ErrorHandler}) ->
 -spec get_error_list(State :: state()) -> jesse:error_list().
 get_error_list(#state{error_list = ErrorList}) ->
   ErrorList.
+
+get_setter_fun(#state{setter_fun = SetterFun}) ->
+  SetterFun.
 
 %% @doc Returns newly created state.
 -spec new( JsonSchema :: jesse:schema()
@@ -425,21 +429,12 @@ get_external_validator(#state{external_validator = Fun}) ->
 get_current_value(#state{current_value = Value}) -> Value.
 
 -spec set_value(State :: state(), jesse:path(), jesse:json_term()) -> state().
-set_value(#state{setter_fun=undefined}=State, _Path, _Value) -> io:format("setter_fun is undefined~n"),
-                                                                State;
-set_value(#state{current_value=undefined}=State, _Path, _Value) -> io:format("current_value is undefined~n"),
-                                                                   State;
+set_value(#state{setter_fun=undefined}=State, _Path, _Value) -> State;
+set_value(#state{current_value=undefined}=State, _Path, _Value) -> State;
 set_value(#state{setter_fun=Setter
                 ,current_value=Value
                 }=State, Path, NewValue) ->
     NewCurrentValue = Setter(Path, NewValue, Value),
-  
-    %%   try
-    %%     ets:tab2list(qweqweqweqwe)
-    %%   catch
-    %%     _:_:Stacktrace -> io:format("~p~n", [Stacktrace])
-    %%   end,
-    %% io:format("current_value updated to ~p~n~n~n", [NewCurrentValue]),
     State#state{current_value = NewCurrentValue}.
 
 -spec validator_options(State :: state()) -> jesse:options().

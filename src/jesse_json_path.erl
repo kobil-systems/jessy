@@ -1,5 +1,7 @@
 %% @copyright 2011 Bob Ippolito
 %% @author Bob Ippolito <bob@redivi.com>
+%%
+%% portions from https://github.com/talentdeficit/json
 
 %% @doc Implementation of Key Value Coding style "queries" for commonly
 %% used Erlang data structures.
@@ -46,8 +48,8 @@ path(Path, P, Default) when is_binary(Path) ->
   path(binary:split(Path, <<".">>, [global]), P, Default);
 path(Path, P, Default) when is_atom(Path) ->
   path(atom_to_binary(Path, utf8), P, Default);
-path(Path=[N | _], P, Default) when is_integer(N) ->
-  path(iolist_to_binary(Path), P, Default);
+%% path(Path=[N | _], P, Default) when is_integer(N) ->
+%%   path(iolist_to_binary(Path), P, Default);
 path([], [], Default) ->
   Default;
 path([], P, _Default) ->
@@ -57,6 +59,13 @@ path([K | Rest], P, Default) ->
 
 %% @doc Return the immediate result of the query for key K in P.
 -spec value(kvc_key(), kvc_obj(), term()) -> term().
+value(0, [], Default) ->
+  Default;
+value(K, P, Default) when is_integer(K) andalso is_list(P) ->
+  case length(P) of
+    L when L =< K -> Default;
+    _ -> lists:nth(K+1, P)
+  end;
 value(K, P, Default) ->
   case proplist_type(P) of
     ?IF_MAPS({{map, Map}, Type} ->
@@ -278,6 +287,8 @@ normalize(K, atom) when is_list(K) ->
   catch error:badarg ->
       K
   end;
+normalize(K, binary) when is_integer(K) ->
+  integer_to_binary(K);
 normalize(K, binary) when is_binary(K) ->
   K;
 normalize(K, binary) when is_atom(K) ->

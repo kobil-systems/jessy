@@ -17,13 +17,13 @@ path_aggregate_test() ->
        jesse_json_path:path('foo.@sum', [{foo, [1, 2, 3]}])),
     ?assertEqual(
        2.0,
-       jesse_json_path:path("foo.@avg", [{foo, [1, 2, 3]}])),
+       jesse_json_path:path(<<"foo.@avg">>, [{foo, [1, 2, 3]}])),
     ?assertEqual(
        1,
        jesse_json_path:path([foo, '@min'], [{foo, [1, 2, 3]}])),
     ?assertEqual(
        3,
-       jesse_json_path:path("foo.@max", [{foo, [1, 2, 3]}])),
+       jesse_json_path:path(<<"foo.@max">>, [{foo, [1, 2, 3]}])),
     ?assertEqual(
        [taco, taco, grande],
        jesse_json_path:path(<<"foo.@unionOfObjects">>,
@@ -46,9 +46,6 @@ value_aggregate_test() ->
     ?assertEqual(
        6,
        jesse_json_path:value('@sum', [1, 2, 3], [])),
-    ?assertEqual(
-       6,
-       jesse_json_path:value("@sum", [1, 2, 3], [])),
     ?assertEqual(
        6,
        jesse_json_path:value(<<"@sum">>, [1, 2, 3], [])),
@@ -132,13 +129,13 @@ path_plist_test() ->
                                   {struct, [{"baz", "wibble"}]}}]}}]})),
     ?assertEqual(
        ok,
-       jesse_json_path:value("foo", [{foo, ok}], [])),
+       jesse_json_path:value(<<"foo">>, [{foo, ok}], [])),
     ?assertEqual(
        ok,
-       jesse_json_path:value("foo", [{<<"foo">>, ok}], [])),
+       jesse_json_path:value(<<"foo">>, [{<<"foo">>, ok}], [])),
     ?assertEqual(
        ok,
-       jesse_json_path:value("foo", {}, ok)),
+       jesse_json_path:value(<<"foo">>, {}, ok)),
     ok.
 
 to_proplist_readme_test() ->
@@ -182,11 +179,11 @@ map_object_test_() ->
     [?_assertEqual(
         not_found,
         jesse_json_path:path(
-          "foo.bar", #{<<"foo">> => #{<<"baz">> => val}}, not_found)),
+          <<"foo.bar">>, #{<<"foo">> => #{<<"baz">> => val}}, not_found)),
      ?_assertEqual(
         val,
         jesse_json_path:path(
-          "foo.bar", #{<<"foo">> => #{<<"bar">> => val}}, not_found)),
+          <<"foo.bar">>, #{<<"foo">> => #{<<"bar">> => val}}, not_found)),
      ?_assertEqual(
         #{a => b},
         jesse_json_path:path(
