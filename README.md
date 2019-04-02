@@ -1,4 +1,4 @@
-**This repository is the actively-maintained follow-up of https://github.com/klarna/jesse. Please update your references.**
+**This repository is the Kobil-maintained follow-up of https://github.com/for-get/jesse.**
 
 # jesse [![Build Status][2]][1]
 
