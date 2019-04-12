@@ -98,6 +98,7 @@
                 | {meta_schema_ver, schema_ver()}
                 | {parser_fun, parser_fun()}
                 | {schema_loader_fun, schema_loader_fun()}
+                | {setter_fun, jesse_state:setter_fun()}
                 | {with_value, jesse:json_term()}.
 
 -type options() :: [option()].
