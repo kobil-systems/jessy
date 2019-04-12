@@ -1,6 +1,7 @@
 **This repository is the Kobil-maintained follow-up of https://github.com/for-get/jesse.**
 
 Also includes portions of https://github.com/talentdeficit/json
+and https://github.com/talentdeficit/jsonpointer
 
 # jesse [![Build Status][2]][1]
 
