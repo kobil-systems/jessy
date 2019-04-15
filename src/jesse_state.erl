@@ -50,6 +50,7 @@
         ]).
 
 -export_type([ state/0
+             , setter_fun/0
              ]).
 
 %% Includes
