@@ -41,6 +41,7 @@
         , set_current_schema/2
         , set_value/3
         , set_error_list/2
+        , set_setter_fun/2
         , resolve_ref/2
         , undo_resolve_ref/2
         , canonical_path/2
@@ -214,6 +215,9 @@ set_current_schema(#state{id = Id} = State, NewSchema) ->
                     ) -> state().
 set_error_list(State, ErrorList) ->
   State#state{error_list = ErrorList}.
+
+set_setter_fun(State, SetterFun) ->
+  State#state{setter_fun = SetterFun}.
 
 %% @doc Resolve a reference.
 -spec resolve_ref(State :: state(), Reference :: jesse:schema_ref()) -> state().

@@ -81,9 +81,17 @@
 check_value(Value, [{?REF, RefSchemaURI} | Attrs], State) ->
   case Attrs of
     [] ->
-      validate_ref(Value, RefSchemaURI, State);
-    _ ->
-      handle_schema_invalid(?only_ref_allowed, State)
+        case RefSchemaURI of
+          <<"http://json-schema.org/draft", _Rest/binary>> ->
+            SetterFun = jesse_state:get_setter_fun(State),
+            State1 = jesse_state:set_setter_fun(State, undefined),
+            State2 = validate_ref(Value, RefSchemaURI, State1),
+            jesse_state:set_setter_fun(State2, SetterFun);
+          _ ->
+            validate_ref(Value, RefSchemaURI, State)
+        end;
+      _ ->
+        handle_schema_invalid(?only_ref_allowed, State)
   end;
 check_value(Value, [{?TYPE, Type} | Attrs], State) ->
   NewState = check_type(Value, Type, State),
@@ -1394,13 +1402,6 @@ set_value(PropertyName, Value, State) ->
     Path = lists:reverse([PropertyName] ++ jesse_state:get_current_path(State)),
     jesse_state:set_value(State, Path, Value).
 
--define(types_for_defaults, [ ?STRING
-                            , ?NUMBER
-                            , ?INTEGER
-                            , ?BOOLEAN
-                            , ?OBJECT
-                            ]).
-
 %% @private
 maybe_follow_reference([{<<"$ref">>, <<"#">>}] = Schema, _State) ->
   Schema;
@@ -1434,4 +1435,3 @@ check_default_(PropertyName, PropertySchema, Default, State) ->
     {false, EList} ->
       jesse_state:set_error_list(State, jesse_state:get_error_list(State) ++ EList)
   end.
-
