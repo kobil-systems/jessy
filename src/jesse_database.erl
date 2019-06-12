@@ -53,6 +53,7 @@
 -type reason()       :: term().
 
 -define(JESSE_ETS, jesse_ets).
+-define(DEFAULT_HTTP_TIMEOUT, 5000).
 
 -include_lib("kernel/include/file.hrl").
 -include("jesse_schema_validator.hrl").
@@ -326,7 +327,7 @@ add_file_uri(Key0) ->
 %% @private
 add_http_uri(Key0) ->
   Key = jesse_state:canonical_path(Key0, Key0),
-  {ok, Response} = httpc:request(get, {Key, []}, [], [{body_format, binary}]),
+  {ok, Response} = httpc:request(get, {Key, []}, [{timeout, ?DEFAULT_HTTP_TIMEOUT}], [{body_format, binary}]),
   {{_Line, 200, _}, Headers, SchemaBin} = Response,
   Schema = jsx:decode(SchemaBin),
   SchemaInfos = [{Key, get_http_mtime(Headers), Schema}],
