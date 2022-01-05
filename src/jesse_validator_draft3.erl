@@ -767,27 +767,54 @@ check_unique_items([], true, State) ->
     State;
 check_unique_items(Value, true, State) ->
   try
-    lists:foldl( fun(_Item, []) ->
-                     ok;
-                    (Item, RestItems) ->
-                     lists:foreach( fun(ItemFromRest) ->
-                                        case is_equal(Item, ItemFromRest) of
-                                          true  ->
-                                            throw({?not_unique, Item});
-                                          false -> ok
+    NoDuplicates = sets:from_list(order_json(Value), [{version, 2}]),
+    case sets:size(NoDuplicates) == length(Value) of
+      true -> State;
+      false ->
+        lists:foldl( fun(_Item, []) ->
+                         ok;
+                        (Item, RestItems) ->
+                         lists:foreach( fun(ItemFromRest) ->
+                                            case is_equal(Item, ItemFromRest) of
+                                              true  ->
+                                                throw({?not_unique, Item});
+                                              false -> ok
+                                            end
                                         end
-                                    end
-                                  , RestItems
-                                  ),
-                     tl(RestItems)
-                 end
-               , tl(Value)
-               , Value
-               ),
-    State
+                                      , RestItems
+                                      ),
+                         tl(RestItems)
+                     end
+                   , tl(Value)
+                   , Value
+                   ),
+        State
+    end
   catch
     throw:ErrorInfo -> handle_data_invalid(ErrorInfo, Value, State)
   end.
+
+%% @private
+order_json(Value) ->
+  order_json_check_object(Value).
+
+order_json_check_object(Value) ->
+  case jesse_lib:is_json_object(Value) of
+    true -> order_json_object(Value);
+    false -> order_json_non_object(Value)
+  end.
+
+order_json_non_object({Key, Val}) ->
+  {Key, order_json_check_object(Val)};
+order_json_non_object(Value) when is_list(Value) ->
+  [order_json_check_object(X) || X <- Value];
+order_json_non_object(Value) ->
+  Value.
+
+order_json_object(Value) when is_list(Value) ->
+  lists:sort([order_json_check_object(X) || X <- Value]);
+order_json_object(Value) ->
+  order_json_object(unwrap(Value)).
 
 %% @doc 5.16.  pattern
 %% When the instance value is a string, this provides a regular
