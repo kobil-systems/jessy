@@ -843,26 +843,41 @@ check_unique_items(_, false, State) ->
   State;
 check_unique_items([], true, State) ->
   State;
+check_unique_items([_], true, State) ->
+  State;
 check_unique_items(Value, true, State) ->
   try
-    lists:foldl( fun(_Item, []) ->
-                     ok;
-                    (Item, RestItems) ->
-                     lists:foreach( fun(ItemFromRest) ->
-                                        case is_equal(Item, ItemFromRest) of
-                                          true  ->
-                                            throw({?not_unique, Item});
-                                          false -> ok
-                                        end
-                                    end
-                                  , RestItems
-                                  ),
-                     tl(RestItems)
-                 end
-               , tl(Value)
-               , Value
-               ),
-    State
+%% First we do an efficient check for duplicates: convert the list to a set
+%% and if there are no duplicates, the set and the list have the same length
+%% In order to avoid differences for lists in which order is not relevant
+%% (e.g. JSON properties of an object maybe represented as a proplist), these
+%% lists for which order is not relevant are sorted (objects are normalized).
+%% If the first efficient check fails, then we search for the items that are
+%% duplicated with a less efficient check (that will very seldom be executed).
+    NormalizedValue = jesse_lib:normalize_and_sort(Value),
+    NoDuplicates = sets:from_list(NormalizedValue, [{version, 2}]),
+    case sets:size(NoDuplicates) == length(Value) of
+      true -> State;
+      false ->
+        lists:foldl( fun(_Item, []) ->
+                       ok;
+                      (Item, RestItems) ->
+                       lists:foreach( fun(ItemFromRest) ->
+                                          case is_equal(Item, ItemFromRest) of
+                                            true  ->
+                                              throw({?not_unique, Item});
+                                            false -> ok
+                                          end
+                                      end
+                                    , RestItems
+                                    ),
+                       tl(RestItems)
+                     end
+                   , tl(Value)
+                   , Value
+                   ),
+        State
+    end
   catch
     throw:ErrorInfo -> handle_data_invalid(ErrorInfo, Value, State)
   end.
