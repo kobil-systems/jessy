@@ -1,1 +1,1 @@
-{incl_app, jesse, details}.
+{incl_app, jessy, details}.
