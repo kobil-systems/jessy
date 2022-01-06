@@ -769,7 +769,14 @@ check_unique_items([_], true, State) ->
     State;
 check_unique_items(Value, true, State) ->
   try
-    NoDuplicates = sets:from_list(order_json(Value), [{version, 2}]),
+%% First we do an efficient check for duplicates: convert the list to a set
+%% and if there are no duplicates, the set and the list have the same length
+%% In order to avoid differences for lists in which order is not relevant
+%% (e.g. JSON properties of an object maybe represented as a proplist), these
+%% lists for which order is not relevant are sorted (objects are normalized).
+%% If the first efficient check fails, then we search for the items that are
+%% duplicated with a less efficient check (that will very seldom be executed).
+    NoDuplicates = sets:from_list(normalize_and_sort(Value), [{version, 2}]),
     case sets:size(NoDuplicates) == length(Value) of
       true -> State;
       false ->
@@ -796,27 +803,52 @@ check_unique_items(Value, true, State) ->
     throw:ErrorInfo -> handle_data_invalid(ErrorInfo, Value, State)
   end.
 
+%% This function ensures that all lists within the JSON object for
+%% which order is not relevant will be sorted.  In this way, there
+%% will be no differences between objects that contain one of those
+%% lists with the same elements but in different order.  Lists for
+%% which order is relevant, e.g. JSON arrays keep their original 
+%% order and will be considered diffferent if the order is different.
 %% @private
-order_json(Value) ->
-  order_json_check_object(Value).
+normalize_and_sort(Value) ->
+  normalize_and_sort_check_object(Value).
 
-order_json_check_object(Value) ->
+%% This code would look much better if we could use normalize_and_sort_check_object
+%% as a guard expression, but that is not possible.  So we need to check
+%% in every recurssion step, first if the Value is a JSON object with
+%% properties, and in that case call a different function for this values.
+%% @private
+normalize_and_sort_check_object(Value) ->
   case jesse_lib:is_json_object(Value) of
-    true -> order_json_object(Value);
-    false -> order_json_non_object(Value)
+    true -> normalize_and_sort_object(Value);
+    false -> normalize_and_sort_non_object(Value)
   end.
 
-order_json_non_object({Key, Val}) ->
-  {Key, order_json_check_object(Val)};
-order_json_non_object(Value) when is_list(Value) ->
-  [order_json_check_object(X) || X <- Value];
-order_json_non_object(Value) ->
+%% This function covers the recursion over:
+%% - properties within an object, seen as tuples. In that case, we run
+%%   the normalization/ordering over the values of these properties.
+%% - JSON arrays, seen as lists. In that case, we keep the order of 
+%%   the list and run the normalization/ordering over each of the values
+%%   in the list.
+%% - Basic JSON types. In that case, we just return the value.
+%% @private
+normalize_and_sort_non_object({Key, Val}) ->
+  {Key, normalize_and_sort_check_object(Val)};
+normalize_and_sort_non_object(Value) when is_list(Value) ->
+  [normalize_and_sort_check_object(X) || X <- Value];
+normalize_and_sort_non_object(Value) ->
   Value.
 
-order_json_object(Value) when is_list(Value) ->
-  lists:sort([order_json_check_object(X) || X <- Value]);
-order_json_object(Value) ->
-  order_json_object(unwrap(Value)).
+%% This function runs the normalization/ordering over the properties
+%% of a JSON object. If the object is not formatted as a list (e.g. a
+%% map), it is unwrapped into a list. Then the list of properties is
+%% order so that its original odering is not relevant, and we run
+%% the normalization/ordering through each of the properties.
+%% @private
+normalize_and_sort_object(Value) when is_list(Value) ->
+  lists:sort([normalize_and_sort_check_object(X) || X <- Value]);
+normalize_and_sort_object(Value) ->
+  normalize_and_sort_object(unwrap(Value)).
 
 %% @doc 5.16.  pattern
 %% When the instance value is a string, this provides a regular
