@@ -29,6 +29,7 @@
         , is_json_object/1
         , is_json_object_empty/1
         , is_null/1
+        , normalize_and_sort/1
         ]).
 
 %% Includes
@@ -106,3 +107,53 @@ is_json_object_empty(Map)
 )
 is_json_object_empty(_) ->
   false.
+
+%% @doc Returns a JSON object in which all lists for
+%% which order is not relevant will be sorted.  In this way, there
+%% will be no differences between objects that contain one of those
+%% lists with the same elements but in different order.  Lists for
+%% which order is relevant, e.g. JSON arrays, keep their original
+%% order and will be considered diffferent if the order is different.
+-spec normalize_and_sort(Value :: any()) -> any().
+normalize_and_sort(Value) ->
+  normalize_and_sort_check_object(Value).
+
+%% This code would look much better if we could use normalize_and_sort_check_object
+%% as a guard expression, but that is not possible.  So we need to check
+%% in every recurssion step, first if the Value is a JSON object with
+%% properties, and in that case call a different function for this values.
+%% @private
+-spec normalize_and_sort_check_object(Value :: any()) -> any().
+normalize_and_sort_check_object(Value) ->
+  case jesse_lib:is_json_object(Value) of
+    true -> normalize_and_sort_object(Value);
+    false -> normalize_and_sort_non_object(Value)
+  end.
+
+%% This function covers the recursion over:
+%% - properties within an object, seen as tuples. In that case, we run
+%%   the normalization/ordering over the values of these properties.
+%% - JSON arrays, seen as lists. In that case, we keep the order of
+%%   the list and run the normalization/ordering over each of the values
+%%   in the list.
+%% - Basic JSON types. In that case, we just return the value.
+%% @private
+-spec normalize_and_sort_non_object(Value :: any()) -> any().
+normalize_and_sort_non_object({Key, Val}) ->
+  {Key, normalize_and_sort_check_object(Val)};
+normalize_and_sort_non_object(Value) when is_list(Value) ->
+  [normalize_and_sort_check_object(X) || X <- Value];
+normalize_and_sort_non_object(Value) ->
+  Value.
+
+%% This function runs the normalization/ordering over the properties
+%% of a JSON object. If the object is not formatted as a list (e.g. a
+%% map), it is unwrapped into a list. Then the list of properties is
+%% order so that its original odering is not relevant, and we run
+%% the normalization/ordering through each of the properties.
+%% @private
+-spec normalize_and_sort_object(Value :: any()) -> any().
+normalize_and_sort_object(Value) when is_list(Value) ->
+  lists:sort([normalize_and_sort_check_object(X) || X <- Value]);
+normalize_and_sort_object(Value) ->
+  normalize_and_sort_object(jesse_json_path:unwrap_value(Value)).
