@@ -28,6 +28,17 @@
 -define(IF_MAPS(Exp), Exp).
 -endif.
 
+%% Use optimization for sets if available
+-ifdef(OTP_RELEASE).
+  -if(?OTP_RELEASE >= 24).
+  %% OTP 24 or higher
+    -define(SET_FROM_LIST(List), sets:from_list(List, [{version, 2}])).
+  -else.
+  %% OTP 23 or lower.
+    -define(SET_FROM_LIST(List), sets:from_list(List)).
+  -endif.
+-endif.
+
 %% Constant definitions for Json schema keywords
 -define(SCHEMA,               <<"$schema">>).
 -define(TYPE,                 <<"type">>).

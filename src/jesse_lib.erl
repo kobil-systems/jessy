@@ -29,7 +29,8 @@
         , is_json_object/1
         , is_json_object_empty/1
         , is_null/1
-        , normalize_and_sort/1
+        , normalize_and_sort/2
+        , is_equal/3
         ]).
 
 %% Includes
@@ -114,20 +115,20 @@ is_json_object_empty(_) ->
 %% lists with the same elements but in different order.  Lists for
 %% which order is relevant, e.g. JSON arrays, keep their original
 %% order and will be considered diffferent if the order is different.
--spec normalize_and_sort(Value :: any()) -> any().
-normalize_and_sort(Value) ->
-  normalize_and_sort_check_object(Value).
+-spec normalize_and_sort(Value :: any(), DraftVersion :: 3 | 4) -> any().
+normalize_and_sort(Value, DraftVersion) ->
+  normalize_and_sort_check_object(Value, DraftVersion).
 
 %% This code would look much better if we could use normalize_and_sort_check_object
 %% as a guard expression, but that is not possible.  So we need to check
 %% in every recurssion step, first if the Value is a JSON object with
 %% properties, and in that case call a different function for this values.
 %% @private
--spec normalize_and_sort_check_object(Value :: any()) -> any().
-normalize_and_sort_check_object(Value) ->
+-spec normalize_and_sort_check_object(Value :: any(), DraftVersion :: 3 | 4) -> any().
+normalize_and_sort_check_object(Value, DraftVersion) ->
   case jesse_lib:is_json_object(Value) of
-    true -> normalize_and_sort_object(Value);
-    false -> normalize_and_sort_non_object(Value)
+    true -> normalize_and_sort_object(Value, DraftVersion);
+    false -> normalize_and_sort_non_object(Value, DraftVersion)
   end.
 
 %% This function covers the recursion over:
@@ -138,13 +139,19 @@ normalize_and_sort_check_object(Value) ->
 %%   in the list.
 %% - Basic JSON types. In that case, we just return the value.
 %% @private
--spec normalize_and_sort_non_object(Value :: any()) -> any().
-normalize_and_sort_non_object({Key, Val}) ->
-  {Key, normalize_and_sort_check_object(Val)};
-normalize_and_sort_non_object(Value) when is_list(Value) ->
-  [normalize_and_sort_check_object(X) || X <- Value];
-normalize_and_sort_non_object(Value) ->
-  Value.
+-spec normalize_and_sort_non_object(Value :: any(), DraftVersion :: 3 | 4) -> any().
+normalize_and_sort_non_object({Key, Val}, DraftVersion) ->
+  {Key, normalize_and_sort_check_object(Val, DraftVersion)};
+normalize_and_sort_non_object(Value, DraftVersion) when is_list(Value) ->
+  [normalize_and_sort_check_object(X, DraftVersion) || X <- Value];
+normalize_and_sort_non_object(Value, DraftVersion) ->
+  case DraftVersion of
+    3 -> Value;
+    4 -> case Value of
+           Number when is_number(Number) -> float(Number);
+           _ -> Value
+         end
+  end.
 
 %% This function runs the normalization/ordering over the properties
 %% of a JSON object. If the object is not formatted as a list (e.g. a
@@ -152,8 +159,85 @@ normalize_and_sort_non_object(Value) ->
 %% order so that its original odering is not relevant, and we run
 %% the normalization/ordering through each of the properties.
 %% @private
--spec normalize_and_sort_object(Value :: any()) -> any().
-normalize_and_sort_object(Value) when is_list(Value) ->
-  lists:sort([normalize_and_sort_check_object(X) || X <- Value]);
-normalize_and_sort_object(Value) ->
-  normalize_and_sort_object(jesse_json_path:unwrap_value(Value)).
+-spec normalize_and_sort_object(Value :: any(), DraftVersion :: 3 | 4) -> any().
+normalize_and_sort_object(Value, DraftVersion) when is_list(Value) ->
+  {struct, lists:sort([normalize_and_sort_check_object(X, DraftVersion) || X <- Value])};
+normalize_and_sort_object(Value, DraftVersion) ->
+  normalize_and_sort_object(jesse_json_path:unwrap_value(Value), DraftVersion).
+
+%%=============================================================================
+%% @doc Returns `true' if given values (instance) are equal, otherwise `false'
+%% is returned.
+%%
+%% Two instance are consider equal if they are both of the same type
+%% and:
+%% <ul>
+%%   <li>are null; or</li>
+%%
+%%   <li>are booleans/numbers/strings and have the same value; or</li>
+%%
+%%   <li>are arrays, contains the same number of items, and each item in
+%%       the array is equal to the corresponding item in the other array;
+%%       or</li>
+%%
+%%   <li>are objects, contains the same property names, and each property
+%%       in the object is equal to the corresponding property in the other
+%%       object.</li>
+%% </ul>
+is_equal(Value1, Value2, DraftVersion) ->
+  case jesse_lib:is_json_object(Value1)
+    andalso jesse_lib:is_json_object(Value2) of
+    true  -> compare_objects(Value1, Value2, DraftVersion);
+    false -> case is_list(Value1) andalso is_list(Value2) of
+               true  -> compare_lists(Value1, Value2, DraftVersion);
+               false -> case DraftVersion of
+                          3 -> Value1 =:= Value2;
+                          4 -> Value1 == Value2
+                        end
+             end
+  end.
+
+%% @private
+compare_lists(Value1, Value2, DraftVersion) ->
+  case length(Value1) =:= length(Value2) of
+    true  -> compare_elements(Value1, Value2, DraftVersion);
+    false -> false
+  end.
+
+%% @private
+compare_elements(Value1, Value2, DraftVersion) ->
+  lists:all( fun({Element1, Element2}) ->
+                 is_equal(Element1, Element2, DraftVersion)
+             end
+           , lists:zip(Value1, Value2)
+           ).
+
+%% @private
+compare_objects(Value1, Value2, DraftVersion) ->
+  case length(unwrap(Value1)) =:= length(unwrap(Value2)) of
+    true  -> compare_properties(Value1, Value2, DraftVersion);
+    false -> false
+  end.
+
+%% @private
+compare_properties(Value1, Value2, DraftVersion) ->
+  lists:all( fun({PropertyName1, PropertyValue1}) ->
+                 case get_value(PropertyName1, Value2) of
+                   ?not_found     -> false;
+                   PropertyValue2 -> is_equal(PropertyValue1,
+                                              PropertyValue2,
+                                              DraftVersion)
+                 end
+             end
+           , unwrap(Value1)
+           ).
+
+%%=============================================================================
+%% Wrappers
+%% @private
+get_value(Key, Schema) ->
+  jesse_json_path:value(Key, Schema, ?not_found).
+
+%% @private
+unwrap(Value) ->
+  jesse_json_path:unwrap_value(Value).
