@@ -30,6 +30,7 @@
         , is_json_object_empty/1
         , is_null/1
         , normalize_and_sort/1
+        , is_equal/2
         ]).
 
 %% Includes
@@ -143,6 +144,8 @@ normalize_and_sort_non_object({Key, Val}) ->
   {Key, normalize_and_sort_check_object(Val)};
 normalize_and_sort_non_object(Value) when is_list(Value) ->
   [normalize_and_sort_check_object(X) || X <- Value];
+normalize_and_sort_non_object(Value) when is_number(Value) ->
+  float(Value);
 normalize_and_sort_non_object(Value) ->
   Value.
 
@@ -154,6 +157,80 @@ normalize_and_sort_non_object(Value) ->
 %% @private
 -spec normalize_and_sort_object(Value :: any()) -> any().
 normalize_and_sort_object(Value) when is_list(Value) ->
-  lists:sort([normalize_and_sort_check_object(X) || X <- Value]);
+  {struct, lists:sort([normalize_and_sort_check_object(X) || X <- Value])};
 normalize_and_sort_object(Value) ->
   normalize_and_sort_object(jesse_json_path:unwrap_value(Value)).
+
+%%=============================================================================
+%% @doc Returns `true' if given values (instance) are equal, otherwise `false'
+%% is returned.
+%%
+%% Two instance are consider equal if they are both of the same type
+%% and:
+%% <ul>
+%%   <li>are null; or</li>
+%%
+%%   <li>are booleans/numbers/strings and have the same value; or</li>
+%%
+%%   <li>are arrays, contains the same number of items, and each item in
+%%       the array is equal to the corresponding item in the other array;
+%%       or</li>
+%%
+%%   <li>are objects, contains the same property names, and each property
+%%       in the object is equal to the corresponding property in the other
+%%       object.</li>
+%% </ul>
+-spec is_equal(Value1 :: any(), Value2 :: any()) -> boolean().
+is_equal(Value1, Value2) ->
+  case jesse_lib:is_json_object(Value1)
+    andalso jesse_lib:is_json_object(Value2) of
+    true  -> compare_objects(Value1, Value2);
+    false -> case is_list(Value1) andalso is_list(Value2) of
+               true  -> compare_lists(Value1, Value2);
+               false -> Value1 == Value2
+             end
+  end.
+
+%% @private
+compare_lists(Value1, Value2) ->
+  case length(Value1) =:= length(Value2) of
+    true  -> compare_elements(Value1, Value2);
+    false -> false
+  end.
+
+%% @private
+compare_elements(Value1, Value2) ->
+  lists:all( fun({Element1, Element2}) ->
+                 is_equal(Element1, Element2)
+             end
+           , lists:zip(Value1, Value2)
+           ).
+
+%% @private
+compare_objects(Value1, Value2) ->
+  case length(unwrap(Value1)) =:= length(unwrap(Value2)) of
+    true  -> compare_properties(Value1, Value2);
+    false -> false
+  end.
+
+%% @private
+compare_properties(Value1, Value2) ->
+  lists:all( fun({PropertyName1, PropertyValue1}) ->
+                 case get_value(PropertyName1, Value2) of
+                   ?not_found     -> false;
+                   PropertyValue2 -> is_equal(PropertyValue1,
+                                              PropertyValue2)
+                 end
+             end
+           , unwrap(Value1)
+           ).
+
+%%=============================================================================
+%% Wrappers
+%% @private
+get_value(Key, Schema) ->
+  jesse_json_path:value(Key, Schema, ?not_found).
+
+%% @private
+unwrap(Value) ->
+  jesse_json_path:unwrap_value(Value).
