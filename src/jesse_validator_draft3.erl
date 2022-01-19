@@ -776,7 +776,7 @@ check_unique_items(Value, true, State) ->
 %% lists for which order is not relevant are sorted (objects are normalized).
 %% If the first efficient check fails, then we search for the items that are
 %% duplicated with a less efficient check (that will very seldom be executed).
-    NormalizedValue = jesse_lib:normalize_and_sort(Value, 3),
+    NormalizedValue = jesse_lib:normalize_and_sort(Value),
     NoDuplicates = ?SET_FROM_LIST(NormalizedValue),
     case sets:size(NoDuplicates) == length(Value) of
       true -> State;
@@ -786,8 +786,7 @@ check_unique_items(Value, true, State) ->
                         (Item, RestItems) ->
                          lists:foreach( fun(ItemFromRest) ->
                                             case jesse_lib:is_equal(Item,
-                                                                    ItemFromRest,
-                                                                    3) of
+                                                                    ItemFromRest) of
                                               true  ->
                                                 throw({?not_unique, Item});
                                               false -> ok
@@ -855,7 +854,7 @@ check_max_length(Value, MaxLength, State) ->
 %% @private
 check_enum(Value, Enum, State) ->
   IsValid = lists:any( fun(ExpectedValue) ->
-                           jesse_lib:is_equal(Value, ExpectedValue, 3)
+                           jesse_lib:is_equal(Value, ExpectedValue)
                        end
                      , Enum
                      ),
