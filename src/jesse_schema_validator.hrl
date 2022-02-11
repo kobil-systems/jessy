@@ -34,9 +34,12 @@
   %% OTP 24 or higher
     -define(SET_FROM_LIST(List), sets:from_list(List, [{version, 2}])).
   -else.
-  %% OTP 23 or lower.
+  %% OTP 23, 22 or 21.
     -define(SET_FROM_LIST(List), sets:from_list(List)).
   -endif.
+-else.
+  %% OTP 20 or lower.
+  -define(SET_FROM_LIST(List), sets:from_list(List)).
 -endif.
 
 %% Constant definitions for Json schema keywords

@@ -137,7 +137,11 @@ normalize_and_sort_check_object(Value) ->
 %% - JSON arrays, seen as lists. In that case, we keep the order of
 %%   the list and run the normalization/ordering over each of the values
 %%   in the list.
-%% - Basic JSON types. In that case, we just return the value.
+%% - Basic JSON types. In that case, we just return the value, but for
+%%   numbers we make a reasonable conversion to float so that type is
+%%   not considered in the comparision. If the value and its conversion
+%%   to float are not equal, this should be a big integer, so we leave
+%%   it as it is.
 %% @private
 -spec normalize_and_sort_non_object(Value :: any()) -> any().
 normalize_and_sort_non_object({Key, Val}) ->
@@ -145,21 +149,25 @@ normalize_and_sort_non_object({Key, Val}) ->
 normalize_and_sort_non_object(Value) when is_list(Value) ->
   [normalize_and_sort_check_object(X) || X <- Value];
 normalize_and_sort_non_object(Value) when is_number(Value) ->
-  float(Value);
+  case Value == float(Value) of
+    true -> float(Value);
+    false -> Value
+  end;
 normalize_and_sort_non_object(Value) ->
   Value.
 
 %% This function runs the normalization/ordering over the properties
-%% of a JSON object. If the object is not formatted as a list (e.g. a
-%% map), it is unwrapped into a list. Then the list of properties is
-%% order so that its original odering is not relevant, and we run
+%% of a JSON object. If the object is not formatted as a map (e.g. a
+%% property lsit), it is converted to map. Then we run
 %% the normalization/ordering through each of the properties.
 %% @private
 -spec normalize_and_sort_object(Value :: any()) -> any().
-normalize_and_sort_object(Value) when is_list(Value) ->
-  {struct, lists:sort([normalize_and_sort_check_object(X) || X <- Value])};
+normalize_and_sort_object(Value) when is_map(Value)->
+  maps:map(fun (_K, V) -> normalize_and_sort_check_object(V) end, Value);
 normalize_and_sort_object(Value) ->
-  normalize_and_sort_object(jesse_json_path:unwrap_value(Value)).
+  normalize_and_sort_object(
+    maps:from_list(
+      jesse_json_path:unwrap_value(Value))).
 
 %%=============================================================================
 %% @doc Returns `true' if given values (instance) are equal, otherwise `false'
