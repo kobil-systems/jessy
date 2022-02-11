@@ -177,3 +177,6 @@ ipv4Format(Config) ->
 
 ipv6Format(Config) ->
   do_test("ipv6Format", Config).
+
+uniqueItemsExtra(Config) ->
+  do_test("uniqueItemsExtra", Config).
